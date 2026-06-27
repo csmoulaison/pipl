@@ -1,0 +1,3 @@
+[submodule "code/csm_core"]
+	path = code/csm_core
+	url = https://github.com/csmoulaison/csm_core

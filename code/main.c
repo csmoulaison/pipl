@@ -14,6 +14,10 @@
 #define LINE_END(li) (line[li] == '\n' || line[li] == '\0' || line[li] == EOF)
 #define match(str1, str2) (strcmp(str1, str2) == 0)
 #define copy(str1, str2) (strcpy(str1, str2))
+#define expect(str, pos_msg) { if(!consume() || !match(token, str)) \
+    { fprintf(stderr, "Expected %s %s\n", str, pos_msg); goto invalid_usage; }}
+#define expect_any(pos_msg) { if(!consume()) \
+    { fprintf(stderr, "Expected token %s\n", pos_msg); goto invalid_usage; }}
 
 // Configuration
 char input_paths[MAX_INPUT_FILES][MAX_PATH_LENGTH];
@@ -107,11 +111,7 @@ i32 main(i32 argc, char** argv) {
             if(match(token, "=")) { // pipeline definition
                 // TODO: New pipeline.
                 while(!match(token, ":")) {
-                    // TODO: Replace below with expect() macro.
-                    if(!consume()) {
-                        fprintf(stderr, "Expected : before end of line following pipeline definition.\n");
-                        goto invalid_usage;
-                    }
+                    expect(":", "before end of line following pipeline definition.");
                     // TODO: Store each asset file extension.
                 }
 

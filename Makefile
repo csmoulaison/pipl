@@ -1,4 +1,4 @@
-pipl: code/main.c
+pipl: code/main.c code/debug_helpers.c
 	gcc code/main.c -o pipl -I code/
 
 test: pipl

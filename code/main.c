@@ -11,14 +11,15 @@
 #define MAX_LINE_LENGTH 4096
 #define MAX_TOKEN_LENGTH 256
 #define MAX_PIPELINE_OUTPUTS 8
+#define MAX_ASSET_ARGS 16
 
 #define LINE_END(li) (line[li] == '\n' || line[li] == '\0' || line[li] == EOF)
 #define match(str1, str2) (strcmp(str1, str2) == 0)
 #define copy(str1, str2) (strcpy(str1, str2))
 #define expect(str, msg) { if(!consume() || !match(token, str)) \
-    { fprintf(stderr, "Expected %s %s\n", str, msg); goto invalid_usage; }}
+    { fprintf(stderr, "Expected %s %s\n", str, msg); return false; }}
 #define expect_any(msg) { if(!consume()) \
-    { fprintf(stderr, "Expected %s\n", msg); goto invalid_usage; }}
+    { fprintf(stderr, "Expected %s\n", msg); return false; }}
 
 typedef struct {
     char id[MAX_TOKEN_LENGTH];
@@ -31,7 +32,7 @@ typedef struct {
 typedef struct {
     i32 pipeline_index;
     char id[MAX_TOKEN_LENGTH];
-    char args[MAX_ARG_LENGTH];
+    char args[MAX_ASSET_ARGS][MAX_ARG_LENGTH];
     i32 args_len;
 } AssetDefinition;
 
@@ -47,7 +48,7 @@ char line[MAX_LINE_LENGTH];
 char token[MAX_TOKEN_LENGTH];
 i32 linei = 0;
 i32 tokeni = 0;
-char line_pipeline[MAX_TOKEN_LENGTH];
+char line_pipeline_id[MAX_TOKEN_LENGTH];
 char line_asset_name[MAX_ASSET_NAME] = "\0";
 i32  line_asset_index = -1;
 // Definitions
@@ -77,7 +78,92 @@ bool consume() {
     return true;
 }
 
-bool consume_to_line_end(char* str) {
+bool parse_pipl(FILE* pipl, char* path) {
+    while(fgets(line, MAX_LINE_LENGTH, pipl)) {
+        linei = 0;
+        if(consume()) { 
+            if(match(token, "include")) {
+                expect_any("filename following include directive");
+                FILE* include = fopen(token, "r");
+                if(include == NULL) {
+                    fprintf(stderr, "Could not open file '%s' included in '%s'.\n", token, path);
+                    return false;
+                }
+                if(parse_pipl(include, token) == false) {
+                    return false;
+                }
+            } else {
+                copy(line_pipeline_id, token);
+                i32 existing_pipeline_index = -1;
+                for(i32 i = 0; i < pipelines_len; i++) {
+                    if(match(line_pipeline_id, pipeline_defs[i].id)) {
+                        existing_pipeline_index = i;
+                        break;
+                    }
+                }
+                assert(consume());
+                if(match(token, "=")) {
+                    // Parse pipeline definition
+                    if(existing_pipeline_index != -1) {
+                        fprintf(stderr, "Pipeline '%s' already exists, and redefinitions are not allowed.\n", line_pipeline_id);
+                        panic();
+                    }
+
+                    PipelineDefinition* pipeline = &pipeline_defs[pipelines_len];
+                    memset(pipeline, 0, sizeof(PipelineDefinition));
+                    pipelines_len++;
+                    copy(pipeline->id, line_pipeline_id);
+
+                    while(true) {
+                        expect_any(": or asset type before end of line following pipeline definition");
+                        if(match(token, ":")) {
+                            break;
+                        }
+                        copy(pipeline->outputs[pipeline->outputs_len], token);
+                        pipeline->outputs_len++;
+                    }
+
+                    expect_any("source input filename following : in pipeline definition");
+                    copy(pipeline->input_filename, token);
+
+                    expect_any("command line template following input source filename in pipeline definition");
+                    copy(pipeline->command_template, token);
+                    pipeline->command_template[tokeni] = ' ';
+                    i32 stri = tokeni + 1;
+                    while(consume()) {
+                        copy(&pipeline->command_template[stri], token);
+                        stri += tokeni;
+                        pipeline->command_template[stri] = ' ';
+                        stri++;
+                    }
+#if 1
+                    print_pipeline_def(pipeline);
+#endif
+                } else {
+                    // Parse asset definition
+                    if(existing_pipeline_index == -1) {
+                        fprintf(stderr, "Pipeline '%s' not recognized and new pipelines must be followed by '='.\n");
+                        panic();
+                    }
+
+                    AssetDefinition* asset = &asset_defs[assets_len];
+                    memset(asset, 0, sizeof(AssetDefinition));
+                    assets_len++;
+                    asset->pipeline_index = existing_pipeline_index;
+                    copy(asset->id, token);
+
+                    while(consume()) {
+                        copy(asset->args[asset->args_len], token);
+                        asset->args_len++;
+                    }
+#if 1
+                    print_asset_def(asset);
+#endif
+                } 
+            }
+        }
+    }
+    return true;
 }
 
 i32 main(i32 argc, char** argv) {
@@ -113,11 +199,11 @@ i32 main(i32 argc, char** argv) {
     }
     // Verify arguments
     if(!output_set) {
-        fprintf(stderr, "ERROR: No output filename set.\n");
+        fprintf(stderr, "No output filename set.\n");
         goto invalid_usage;
     }
     if(use_include_path) {
-        fprintf(stderr, "ERROR: file includes not functional yet.\n");
+        fprintf(stderr, "Custom include paths are not functional yet.\n");
         goto invalid_usage;
     }
 
@@ -128,62 +214,23 @@ i32 main(i32 argc, char** argv) {
 
     FILE* pipl = fopen(input_paths[0], "r");
     if(pipl == NULL) {
-        fprintf(stderr, "ERROR: Could not open file \"%s\"\n", input_paths[0]);
+        fprintf(stderr, "Could not open file '%s'.\n", input_paths[0]);
+        goto invalid_usage;
+    }
+    if(parse_pipl(pipl, input_paths[0]) == false) {
         goto invalid_usage;
     }
 
-    while(fgets(line, MAX_LINE_LENGTH, pipl)) {
-        linei = 0;
-        if(consume()) { 
-            copy(line_pipeline, token);
-            assert(consume());
-            if(match(token, "=")) {
-                // Parse pipeline definition
-                PipelineDefinition* pipeline = &pipeline_defs[pipelines_len];
-                memset(pipeline, 0, sizeof(PipelineDefinition));
-                pipelines_len++;
-                // Pipeline id
-                copy(pipeline->id, line_pipeline);
-                // Pipeline outputs
-                while(true) {
-                    expect_any(": or asset type before end of line following pipeline definition");
-                    if(match(token, ":")) {
-                        break;
-                    }
-                    copy(pipeline->outputs[pipeline->outputs_len], token);
-                    pipeline->outputs_len++;
-                }
-                // Source input filename
-                expect_any("source input filename following : in pipeline definition");
-                copy(pipeline->input_filename, token);
-                // Command line template
-                expect_any("command line template following input source filename in pipeline definition");
-                copy(pipeline->command_template, token);
-                pipeline->command_template[tokeni] = ' ';
-                i32 stri = tokeni + 1;
-                while(consume()) {
-                    copy(&pipeline->command_template[stri], token);
-                    stri += tokeni;
-                    pipeline->command_template[stri] = ' ';
-                    stri++;
-                }
-#if 1
-                print_pipeline_def(pipeline);
-#endif
-            } else { // asset definition
-                fprintf(stderr, "Expected pipeline definition, got '%s'.\n", token);
-                panic();
-                // TODO: Check existence of the pipeline with the id.
-                // TODO: Store next token as asset name.
-                // TODO: Check if source file exists and is newer than pack.
-                // TODO: Store argument strings.
-                // TODO: Expand pipeline command line template and run.
-                // TODO: Ensure that the specified file has been created.
-                //          (maybe store old file modified time to verify)
-            } // TODO: Check for include directive and read that if so. Implies
-              // recursive function call for .pipl parsing.
-        }
-    }
+    // =====================================================
+    // Process outdated assets
+    // TODO: Check if source file exists and is newer than
+    //       pack.
+    // TODO: Expand pipeline command line template and run.
+    // TODO: Ensure that the specified file has been
+    //       created.
+    //         (store old file modified time to verify?)
+    // =====================================================
+
 
     // =====================================================
     // Pack asset file

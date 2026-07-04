@@ -2,7 +2,7 @@
 #define CSM_SKIP_MATH
 #include "csm_core/core.h"
 
-#define DEBUG_PRINT_PARSE_OUTPUT 0
+#define DEBUG_PRINT_PARSE_OUTPUT 1
 
 #define MAX_INPUT_FILES 64
 #define MAX_PATH_LENGTH 4096
@@ -15,7 +15,7 @@
 #define MAX_PIPELINE_OUTPUTS 8
 #define MAX_ASSET_ARGS 16
 
-#define LINE_END(li) (line[li] == '\n' || line[li] == '\0' || line[li] == EOF)
+#define LINE_END(li) (line[li] == '\n' || line[li] == '\0' || line[li] == EOF || line[li] == '#')
 #define match(str1, str2) (strcmp(str1, str2) == 0)
 #define copy(str1, str2) (strcpy(str1, str2))
 #define expect(str, msg) { if(!consume() || !match(token, str)) \
@@ -40,8 +40,7 @@ typedef struct {
 
 // Configuration
 char input_paths[MAX_INPUT_FILES][MAX_PATH_LENGTH];
-bool output_set = false;
-char output_path[MAX_PATH_LENGTH];
+char output_path[MAX_PATH_LENGTH] = "./pack.data";
 bool use_include_path = false;
 char include_path[MAX_PATH_LENGTH];
 bool pack_clean = false;
@@ -68,7 +67,9 @@ bool consume() {
     }
     while(line[linei] == ' ') {
         linei++;
-        assert(!LINE_END(linei));
+        if(LINE_END(linei)) {
+            return false;
+        }
     }
     tokeni = 0;
     while(!LINE_END(linei) && line[linei] != ' ') {
@@ -94,10 +95,6 @@ bool parse_pipl(FILE* pipl, char* path) {
                 if(parse_pipl(include, token) == false) {
                     return false;
                 }
-                continue;
-            }
-
-            if(token[0] == '#') {
                 continue;
             }
 
@@ -150,7 +147,7 @@ bool parse_pipl(FILE* pipl, char* path) {
             } else {
                 // Parse asset definition
                 if(existing_pipeline_index == -1) {
-                    fprintf(stderr, "Pipeline '%s' not recognized and new pipelines must be followed by '='.\n");
+                    fprintf(stderr, "Pipeline '%s' not recognized and new pipelines must be followed by '='.\n", line_pipeline_id);
                     panic();
                 }
 
@@ -193,7 +190,6 @@ i32 main(i32 argc, char** argv) {
             assert(argi < argc);
             argi++; 
             copy(output_path, argv[argi]);
-            output_set = true;
         } else if(match(arg, "-i") || match(arg, "--include")) {
             assert(argi < argc);
             argi++; 
@@ -205,39 +201,50 @@ i32 main(i32 argc, char** argv) {
         argi++;
     }
     // Verify arguments
-    if(!output_set) {
-        fprintf(stderr, "No output filename set.\n");
-        goto invalid_usage;
-    }
     if(use_include_path) {
         fprintf(stderr, "Custom include paths are not functional yet.\n");
         goto invalid_usage;
     }
 
     // =====================================================
-    // Parse .pipl file
+    // Parse .pipl file/s
     // TODO: Parse multiple files.
     // =====================================================
 
     FILE* pipl = fopen(input_paths[0], "r");
     if(pipl == NULL) {
         fprintf(stderr, "Could not open file '%s'.\n", input_paths[0]);
-        goto invalid_usage;
+        goto error;
     }
     if(parse_pipl(pipl, input_paths[0]) == false) {
-        goto invalid_usage;
+        goto error;
     }
 
     // =====================================================
     // Process outdated assets
-    // TODO: Check if source file exists and is newer than
-    //       pack.
-    // TODO: Expand pipeline command line template and run.
-    // TODO: Ensure that the specified file has been
-    //       created.
-    //         (store old file modified time to verify?)
     // =====================================================
 
+	struct stat out_stat;
+	u64 out_last_modified = 0;
+	if(stat(output_path, &out_stat) == 0) {
+    	out_last_modified = out_stat.st_mtim.tv_sec;
+	}
+	for(i32 i = 0; i < assets_len; i++) {
+    	AssetDefinition* asset_def = &asset_defs[i];
+    	char asset_path[MAX_PATH_LENGTH] = "";
+    	struct stat asset_stat;
+        // TODO: Expand filename into asset_path
+    	u64 asset_last_modified = UINT64_MAX;
+    	if(stat(asset_path, &asset_stat) == 0) {
+        	u64 asset_last_modified = asset_stat.st_mtim.tv_sec;
+    	}
+    	if(out_last_modified < asset_last_modified) {
+            // TODO: Execute expanded command template.
+            // TODO: Ensure specified files were created,
+            //       referencing the old last modified time
+            //       if applicable.
+    	}
+	}
 
     // =====================================================
     // Pack asset file
@@ -256,6 +263,9 @@ i32 main(i32 argc, char** argv) {
     // =====================================================
     // Handle errors
     // =====================================================
+error:
+    fprintf(stderr, "PIPL terminated with error.\n");
+    return 1;
 invalid_usage:
     fprintf(stderr, "\nUsage:\n\n \
     pipl <input_filename ... > -o <output_filename> <arguments ... >\n\n\

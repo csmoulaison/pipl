@@ -2,6 +2,8 @@
 #define CSM_SKIP_MATH
 #include "csm_core/core.h"
 
+#define DEBUG_PRINT_PARSE_OUTPUT 0
+
 #define MAX_INPUT_FILES 64
 #define MAX_PATH_LENGTH 4096
 #define MAX_PIPELINES 256
@@ -92,75 +94,80 @@ bool parse_pipl(FILE* pipl, char* path) {
                 if(parse_pipl(include, token) == false) {
                     return false;
                 }
-            } else {
-                copy(line_pipeline_id, token);
-                i32 existing_pipeline_index = -1;
-                for(i32 i = 0; i < pipelines_len; i++) {
-                    if(match(line_pipeline_id, pipeline_defs[i].id)) {
-                        existing_pipeline_index = i;
+                continue;
+            }
+
+            if(token[0] == '#') {
+                continue;
+            }
+
+            copy(line_pipeline_id, token);
+            i32 existing_pipeline_index = -1;
+            for(i32 i = 0; i < pipelines_len; i++) {
+                if(match(line_pipeline_id, pipeline_defs[i].id)) {
+                    existing_pipeline_index = i;
+                    break;
+                }
+            }
+            assert(consume());
+            if(match(token, "=")) {
+                // Parse pipeline definition
+                if(existing_pipeline_index != -1) {
+                    fprintf(stderr, "Pipeline '%s' already exists, and redefinitions are not allowed.\n", line_pipeline_id);
+                    panic();
+                }
+
+                PipelineDefinition* pipeline = &pipeline_defs[pipelines_len];
+                memset(pipeline, 0, sizeof(PipelineDefinition));
+                pipelines_len++;
+                copy(pipeline->id, line_pipeline_id);
+
+                while(true) {
+                    expect_any(": or asset type before end of line following pipeline definition");
+                    if(match(token, ":")) {
                         break;
                     }
+                    copy(pipeline->outputs[pipeline->outputs_len], token);
+                    pipeline->outputs_len++;
                 }
-                assert(consume());
-                if(match(token, "=")) {
-                    // Parse pipeline definition
-                    if(existing_pipeline_index != -1) {
-                        fprintf(stderr, "Pipeline '%s' already exists, and redefinitions are not allowed.\n", line_pipeline_id);
-                        panic();
-                    }
 
-                    PipelineDefinition* pipeline = &pipeline_defs[pipelines_len];
-                    memset(pipeline, 0, sizeof(PipelineDefinition));
-                    pipelines_len++;
-                    copy(pipeline->id, line_pipeline_id);
+                expect_any("source input filename following : in pipeline definition");
+                copy(pipeline->input_filename, token);
 
-                    while(true) {
-                        expect_any(": or asset type before end of line following pipeline definition");
-                        if(match(token, ":")) {
-                            break;
-                        }
-                        copy(pipeline->outputs[pipeline->outputs_len], token);
-                        pipeline->outputs_len++;
-                    }
-
-                    expect_any("source input filename following : in pipeline definition");
-                    copy(pipeline->input_filename, token);
-
-                    expect_any("command line template following input source filename in pipeline definition");
-                    copy(pipeline->command_template, token);
-                    pipeline->command_template[tokeni] = ' ';
-                    i32 stri = tokeni + 1;
-                    while(consume()) {
-                        copy(&pipeline->command_template[stri], token);
-                        stri += tokeni;
-                        pipeline->command_template[stri] = ' ';
-                        stri++;
-                    }
-#if 1
-                    print_pipeline_def(pipeline);
+                expect_any("command line template following input source filename in pipeline definition");
+                copy(pipeline->command_template, token);
+                pipeline->command_template[tokeni] = ' ';
+                i32 stri = tokeni + 1;
+                while(consume()) {
+                    copy(&pipeline->command_template[stri], token);
+                    stri += tokeni;
+                    pipeline->command_template[stri] = ' ';
+                    stri++;
+                }
+#if DEBUG_PRINT_PARSE_OUTPUT
+                print_pipeline_def(pipeline);
 #endif
-                } else {
-                    // Parse asset definition
-                    if(existing_pipeline_index == -1) {
-                        fprintf(stderr, "Pipeline '%s' not recognized and new pipelines must be followed by '='.\n");
-                        panic();
-                    }
+            } else {
+                // Parse asset definition
+                if(existing_pipeline_index == -1) {
+                    fprintf(stderr, "Pipeline '%s' not recognized and new pipelines must be followed by '='.\n");
+                    panic();
+                }
 
-                    AssetDefinition* asset = &asset_defs[assets_len];
-                    memset(asset, 0, sizeof(AssetDefinition));
-                    assets_len++;
-                    asset->pipeline_index = existing_pipeline_index;
-                    copy(asset->id, token);
+                AssetDefinition* asset = &asset_defs[assets_len];
+                memset(asset, 0, sizeof(AssetDefinition));
+                assets_len++;
+                asset->pipeline_index = existing_pipeline_index;
+                copy(asset->id, token);
 
-                    while(consume()) {
-                        copy(asset->args[asset->args_len], token);
-                        asset->args_len++;
-                    }
-#if 1
-                    print_asset_def(asset);
+                while(consume()) {
+                    copy(asset->args[asset->args_len], token);
+                    asset->args_len++;
+                }
+#if DEBUG_PRINT_PARSE_OUTPUT
+                print_asset_def(asset);
 #endif
-                } 
-            }
+            } 
         }
     }
     return true;

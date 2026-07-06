@@ -3,3 +3,6 @@ pipl: code/main.c code/debug_helpers.c
 
 test: pipl
 	./pipl test.pipl -o out_pack
+
+clean:
+	rm pipl

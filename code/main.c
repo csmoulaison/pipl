@@ -27,7 +27,7 @@ typedef struct {
     char id[MAX_TOKEN_LENGTH];
     char outputs[MAX_PIPELINE_OUTPUTS][MAX_TOKEN_LENGTH];
     i32 outputs_len;
-    char input_filename[MAX_PATH_LENGTH];
+    char input_path[MAX_PATH_LENGTH];
     char command_template[MAX_ARG_LENGTH];
 } PipelineDefinition;
 
@@ -81,6 +81,74 @@ bool consume() {
     return true;
 }
 
+void expand_template(AssetDefinition* asset, char* template, char* out) {
+    PipelineDefinition* pipeline = &pipeline_defs[asset->pipeline_index];
+    i32 template_i = 0;
+    i32 out_i = 0;
+    while(template[template_i] != '\0') {
+        if(template[template_i] == '!') {
+            char* expand_str = NULL;
+            switch(template[template_i + 1]) {
+                case '$': 
+                    expand_str = asset->id; 
+                    break;
+                case '0': 
+                    assert(asset->args_len > 0); 
+                    expand_str = asset->args[0]; 
+                    break;
+                case '1': 
+                    assert(asset->args_len > 1); 
+                    expand_str = asset->args[1]; 
+                    break;
+                case '2': 
+                    assert(asset->args_len > 2); 
+                    expand_str = asset->args[2]; 
+                    break;
+                case '3': 
+                    assert(asset->args_len > 3); 
+                    expand_str = asset->args[3]; 
+                    break;
+                case '4': 
+                    assert(asset->args_len > 4); 
+                    expand_str = asset->args[4]; 
+                    break;
+                case '5': 
+                    assert(asset->args_len > 5); 
+                    expand_str = asset->args[5]; 
+                    break;
+                case '6': 
+                    assert(asset->args_len > 6); 
+                    expand_str = asset->args[6]; 
+                    break;
+                case '7': 
+                    assert(asset->args_len > 7); 
+                    expand_str = asset->args[7]; 
+                    break;
+                case '8': 
+                    assert(asset->args_len > 8); 
+                    expand_str = asset->args[8]; 
+                    break;
+                case '9': 
+                    assert(asset->args_len > 9); 
+                    expand_str = asset->args[9]; 
+                    break;
+                default: {
+                    fprintf(stderr, "Unexpected symbol following '_' in template expansion.\n");
+                    exit(1);
+                }
+            }
+            assert(expand_str != NULL);
+            copy(&(out[out_i]), expand_str);
+            out_i += strlen(expand_str);
+            template_i += 2;
+        } else {
+            out[out_i] = template[template_i];
+            template_i++;
+            out_i++;
+        }
+    }
+}
+
 bool parse_pipl(FILE* pipl, char* path) {
     while(fgets(line, MAX_LINE_LENGTH, pipl)) {
         linei = 0;
@@ -129,7 +197,7 @@ bool parse_pipl(FILE* pipl, char* path) {
                 }
 
                 expect_any("source input filename following : in pipeline definition");
-                copy(pipeline->input_filename, token);
+                copy(pipeline->input_path, token);
 
                 expect_any("command line template following input source filename in pipeline definition");
                 copy(pipeline->command_template, token);
@@ -231,18 +299,18 @@ i32 main(i32 argc, char** argv) {
 	}
 	for(i32 i = 0; i < assets_len; i++) {
     	AssetDefinition* asset_def = &asset_defs[i];
-    	char asset_path[MAX_PATH_LENGTH] = "";
+    	PipelineDefinition* pipeline = &pipeline_defs[asset_def->pipeline_index];
+        char asset_path[MAX_PATH_LENGTH] = "\0";
+    	expand_template(asset_def, pipeline->input_path, asset_path);
     	struct stat asset_stat;
-        // TODO: Expand filename into asset_path
     	u64 asset_last_modified = UINT64_MAX;
     	if(stat(asset_path, &asset_stat) == 0) {
         	u64 asset_last_modified = asset_stat.st_mtim.tv_sec;
     	}
     	if(out_last_modified < asset_last_modified) {
-            // TODO: Execute expanded command template.
-            // TODO: Ensure specified files were created,
-            //       referencing the old last modified time
-            //       if applicable.
+        	char command[MAX_LINE_LENGTH] = "\0";
+        	expand_template(asset_def, pipeline->command_template, command);
+        	system(command);
     	}
 	}
 

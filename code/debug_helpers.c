@@ -5,7 +5,7 @@ void print_pipeline_def(PipelineDefinition* pipeline) {
     for(i32 i = 0; i < pipeline->outputs_len; i++) {
         printf("        %i: %s\n", i, pipeline->outputs[i]);
     }
-    printf("    Input:       %s\n", pipeline->input_filename);
+    printf("    Input:       %s\n", pipeline->input_path);
     printf("    Command:     %s\n", pipeline->command_template);
 }
 

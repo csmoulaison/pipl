@@ -1,7 +1,7 @@
 include incl.pipl      # george from here
 
-model = .mesh .texture : _$.blend sh process_blend.sh _$ _0
-font  = .font .texture : _$.ttf   sh process_font.sh _$
+model = .mesh .texture : !$.blend sh process_blend.sh !$ !0
+font  = .font .texture : !$.ttf   sh process_font.sh !$
 
 model cube flat
 

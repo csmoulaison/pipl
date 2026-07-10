@@ -6,7 +6,13 @@
 
 char blend_cmd[] = "blender --background --python tmp.py -- %s.blend %s.obj %s.bmp";
 
+// NOW: Before we do this, reorganize csm_core to include ALL the things, then
+// make obj.h and bmp.h, getting into the habit of helpers driving programs.
+
 i32 main(i32 argc, char** argv) {
+    // =====================================================
+    // Process .blend into .obj and .bmp files
+    // =====================================================
     FILE* py = fopen("tmp.py", "w");
     fwrite(code_model_blender_export_py, code_model_blender_export_py_len, 1, py);
     fclose(py);
@@ -15,5 +21,14 @@ i32 main(i32 argc, char** argv) {
     char cmd_buf[4096];
     sprintf(cmd_buf, blend_cmd, asset_name, asset_name, asset_name);
     system(cmd_buf);
+
+    // =====================================================
+    // Process .obj into mesh file
+    // =====================================================
+     
+    // =====================================================
+    // Process .bmp into texture file
+    // =====================================================
+    
     return 0;
 }

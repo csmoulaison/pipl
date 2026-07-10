@@ -1,18 +1,6 @@
-// NOW: working on changing "asset" concept to "instance". assets ought to refer
-//      to the finished output file, which is not 1:1 with instances.
-      
-// NOW: some disparate thoughts I was having:
-//      - pipl is first and foremost a data format. this code is an interpreter
-//        (and probably eventually library for processing) that format.
-//      - there should probably be multiple inputs files supported.
-//      - outputs should omit the ., as the . is only applicable to the filename
-//        aspect of outputs, and there are other relevant aspects, such as what
-//        the eventual C #define will be labeled.
-//      - we should probably not make this a multi-pass situation like we have
-//        now, with files parsed and THEN processed. Doing it all as a live
-//        interpreter allows us to easily support dependencies between process
-//        steps and makes the asset generation process a *little bit*
-//        imperative, which is GOOD.
+// NOW: Reorganize this so it can be included into a project as a helper lib.
+// Meaning, put code in root with "library" functions, with interpreter program
+// as a subdirectory. Maybe, idk
 
 #define CSM_IMPLEMENTATION
 #define CSM_SKIP_MATH
@@ -225,6 +213,7 @@ bool interpret_pipl(FILE* pipl, char* path) {
                     definition->outputs_len++;
                 }
 
+                // TODO: Support multiple input files, probably reorder in/out.
                 expect_any("source input filename following : in definition definition");
                 copy(definition->input_path, token);
 
@@ -354,7 +343,7 @@ i32 main(i32 argc, char** argv) {
 
     // =====================================================
     // Interpret .pipl file/s
-    // TODO: Parse multiple files.
+    // TODO: Parse multiple pipl files.
     // =====================================================
 
     FILE* pipl = fopen(input_paths[0], "r");
@@ -380,25 +369,10 @@ i32 main(i32 argc, char** argv) {
         fprintf(stderr, "Could not open output path '%s' for writing.\n", output_path);
         goto error;
     }
-
-    for(i32 i = 0; i < instances_len; i++) {
-        Instance* asset = &instances[i];
-        u64 packed_size = 0;
-        Definition* definition = &definitions[asset->definition_index];
-        for(i32 j = 0; j < definition->outputs_len; j++) {
-            char asset_fname[4096];
-            sprintf(asset_fname, "%s.%s", asset->id, definition->outputs[j]);
-            FILE* asset_file = fopen(asset_fname, "r");
-            char write_buf[256];
-            u64 bytes_read = 0;
-            while((bytes_read = fread(write_buf, 1, sizeof(write_buf), asset_file)) > 0) {
-                fwrite(write_buf, 1, bytes_read, out_file);
-                packed_size += bytes_read;
-            }
-            fclose(asset_file);
-        }
-    }
+    // TODO: write output buffer to file.
     fclose(out_file);
+
+    // TODO: Generate C code. Make codegen.h in csm_core.
 
     return 0;
 

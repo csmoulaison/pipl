@@ -1,20 +1,20 @@
-void print_pipeline_def(PipelineDefinition* pipeline) {
-    printf("\nPipeline\n");
-    printf("    Id:          %s\n", pipeline->id);
-    printf("    Outputs len: %i\n", pipeline->outputs_len);
-    for(i32 i = 0; i < pipeline->outputs_len; i++) {
-        printf("        %i: %s\n", i, pipeline->outputs[i]);
+void print_definition(Definition* definition) {
+    printf("\nDefinition\n");
+    printf("    Id:          %s\n", definition->id);
+    printf("    Outputs len: %i\n", definition->outputs_len);
+    for(i32 i = 0; i < definition->outputs_len; i++) {
+        printf("        %i: %s\n", i, definition->outputs[i]);
     }
-    printf("    Input:       %s\n", pipeline->input_path);
-    printf("    Command:     %s\n", pipeline->command_template);
+    printf("    Input:       %s\n", definition->input_path);
+    printf("    Command:     %s\n", definition->command_template);
 }
 
-void print_asset_def(AssetDefinition* asset) {
+void print_instance(Instance* instance) {
     printf("\nAsset\n");
-    printf("    Id:       %s\n", asset->id);
-    printf("    Pipeline: %i\n", asset->pipeline_index);
-    printf("    Args len: %i\n", asset->args_len);
-    for(i32 i = 0; i < asset->args_len; i++) {
-        printf("        %i: %s\n", i, asset->args[i]);
+    printf("    Id:       %s\n", instance->id);
+    printf("    Definition: %i\n", instance->definition_index);
+    printf("    Args len: %i\n", instance->args_len);
+    for(i32 i = 0; i < instance->args_len; i++) {
+        printf("        %i: %s\n", i, instance->args[i]);
     }
 }

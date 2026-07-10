@@ -1,2 +1,2 @@
-model = .mesh .texture : !$.blend ./model !$
+model = mesh texture : !$.blend ./model !$
 model ship

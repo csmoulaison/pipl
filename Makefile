@@ -4,6 +4,7 @@ bin/pipl: code/pipl/main.c code/pipl/debug_helpers.c bin/model
 
 test: bin/pipl
 	cp test.pipl bin/test.pipl
+	cp ship.blend bin/ship.blend
 	(cd bin && ./pipl test.pipl -o out_pack)
 
 clean:

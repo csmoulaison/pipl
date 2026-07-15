@@ -13,4 +13,4 @@ clean:
 bin/model: code/model/main.c
 	mkdir -p bin
 	xxd -i code/model/blender_export.py > code/model/blender_export.c
-	gcc code/model/main.c -o bin/model -I code/
+	gcc code/model/main.c -o bin/model -I code/ -lm

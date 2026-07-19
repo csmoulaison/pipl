@@ -24,7 +24,10 @@ bpy.ops.wm.obj_export(
     export_triangulated_mesh = True)
 
 workdir = pathlib.Path().resolve()
+filepath = str(workdir / bmp_file)
 img = bpy.data.images["ao"]
-img.filepath_raw = str(workdir / bmp_file)
-img.file_format = "BMP"
-img.save()
+scene = bpy.context.scene
+original_format = scene.render.image_settings.file_format
+scene.render.image_settings.file_format = 'BMP'
+img.save_render(filepath, scene=scene)
+scene.render.image_settings.file_format = original_format

@@ -1,13 +1,15 @@
 #define CSM_IMPLEMENTATION
 #define CSM_MODULE_MATH
 #define CSM_MODULE_MESH
+#define CSM_MODULE_TEXTURE
 #include "csm_core/core.h"
 
 #include "blender_export.c"
 
 char fname_buf[4096];
-char file_buf[1280000];
+char file_buf[64000000];
 char blend_cmd[] = "blender --background --python tmp.py -- %s.blend %s.obj %s.bmp";
+TextureData tex_data;
 
 // make obj.h and bmp.h in core, getting into a happy helpers habit.
 
@@ -52,6 +54,29 @@ i32 main(i32 argc, char** argv) {
     // =====================================================
     // Process .bmp into texture file
     // =====================================================
+
+    StringWriter fname_writer = string_writer_from_memory(fname_buf, sizeof(fname_buf));
+    string_write_cstring(&fname_writer, asset_name);
+    string_write_cstring(&fname_writer, ".bmp");
+    File file = file_open(&fname_writer.string, FILE_OPEN_READ);
+    StringWriter file_writer = string_writer_from_memory(file_buf, sizeof(file_buf));
+    string_write_file(&file, &file_writer);
+    file_close(&file);
+
+    texture_from_bmp(&file_writer.string, &tex_data);
+
+    string_writer_clear(&fname_writer);
+    string_write_cstring(&fname_writer, asset_name);
+    string_write_cstring(&fname_writer, ".texture");
+
+    char buf[4096];
+    string_to_cstring(&fname_writer.string, buf, 4096);
+    printf("filename %s\n", buf);
+    file = file_open(&fname_writer.string, FILE_OPEN_WRITE);
+    file_write(&file, 
+        &tex_data, sizeof(u64) * 2 
+        + sizeof(PixelData) * tex_data.height * tex_data.width);
+    file_close(&file);
     
     return 0;
 }
